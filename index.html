@@ -7,17 +7,20 @@
     <link rel="stylesheet" type="text/css" href="style.css" />
 </head>
 <body>
-	<canvas id="map" width="720" height="480" style="border:1px solid #d3d3d3;">
+	<canvas id="map" width="720" height="480" />
 	Your browser does not support the HTML5 canvas tag.</canvas>
 	<br>
 	<div id="stats">
     	<strong>Simulation ready</strong>
 	</div>
+	<div id="probe"></div>
 	<button id="playpause" onclick="map.play()">Play</button>
 	<button id="step" onclick="map.step()">Step</button>
 </body>
 <script>
-	var map = new Map({width: 72, height: 48});
-	map.draw();
+	window.onload = function() {
+		var map = new Map({width: 72, height: 48});
+		map.draw();
+	}
 </script>
 </html>

@@ -19,7 +19,10 @@ function Map(params) {
   this.bounds = { width: width * SIZE, height:height * SIZE };
   this.tile_bounds = { width: width, height:height };
 
+  document.getElementById("map").addEventListener("mousemove", this.mouseOverListener);
+
   this.draw = function() {
+
     var canvas = document.getElementById("map");
     var context = canvas.getContext("2d");
 
@@ -32,6 +35,22 @@ function Map(params) {
     organisms.forEach(function(organism) {
       organism.displayOn(context);
     });
+  }
+
+  this.mouseOverListener = function(ev) {
+    var probe = document.getElementById("probe"),
+        tileCoords = map.worldToTileCoords(ev.clientX, ev.clientY),
+        i = tileCoords[0], j = tileCoords[1],
+        tile = map.tileAt(i, j);
+    probe.innerHTML =
+      "<strong>x:</strong> " + ev.x + "<br>" +
+      "<strong>y:</strong> " + ev.y + "<br>" +
+      "<strong>tile:</strong> " + [i, j] + "<br>" +
+      "<strong>cover:</strong> " + tile.cover.type + "<br>" +
+      "<strong>inhabitants:</strong> " + tile.inhabitants.length;
+    probe.style.display = "block";
+    probe.style.top = ev.y + "px";
+    probe.style.left = ev.x + "px";
   }
 
   var playButton = document.getElementById("playpause"),
@@ -309,6 +328,7 @@ function Organism(map) {
   
   this.map = map;
   this.health = this.species.health;
+  this.move = this.species.move;
   this.birthday = map.day;
   this.last_drink = map.hour;   // need to drink 3-4 times per day
   this.last_food = map.hour;    // carnivores need to eat every 2-3 days, herbivores constantly eat
@@ -433,7 +453,9 @@ function Organism(map) {
       // if we are at the prey, eat it
       if (distance(this, nearest) == 0) {
         if (nearest.species.type == "PLANT") {
-          nearest.size -= 1;
+          // let it take one hour to eat a plant of size 1
+          // 60 rounds/second * 60 seconds/minute * 60 minutes/hour
+          nearest.size -= 1/(60*60*60);
           if (nearest.size <= 0) {
             nearest.die();
           }
@@ -445,8 +467,8 @@ function Organism(map) {
       }
       else {
         // TODO take move speed into account
-        dx = this.x + Math.sign(nearest.x - this.x);
-        dy = this.y + Math.sign(nearest.y - this.y);
+        dx = this.x + Math.sign(nearest.x - this.x) * this.move / 10;
+        dy = this.y + Math.sign(nearest.y - this.y) * this.move / 10;
       }
     }
 
@@ -477,6 +499,7 @@ function Organism(map) {
   this.die = function() {
     if (this.status != "DEAD") {
       this.status = "DEAD";
+      this.move = 0;
       this.map.kill_organism(this);
       var tileIndex = this.tile.inhabitants.indexOf(this);
       if (tileIndex < 0) {
@@ -496,7 +519,7 @@ function Organism(map) {
   this.displayOn = function(context) {
     context.fillStyle = this.color;
     context.beginPath();
-    context.arc(this.x-this.size/2, this.y-this.size/2, this.size, 0, Math.PI*2);
+    context.arc(this.x-Math.sqrt(this.size)/2, this.y-Math.sqrt(this.size)/2, Math.sqrt(this.size), 0, Math.PI*2);
     context.fill();
   }
 }
@@ -517,7 +540,6 @@ function Plant(map) {
   // TODO plants don't move but they grow, reproduce and die
   this.update = function() {
   }
-
 }
 
 Plant.prototype = Object.create(Organism.prototype);
@@ -558,7 +580,7 @@ var species_types = [
     fecundity: 0.65,
     abundance: 0.85,
     lifespan: 2,
-    size: 3
+    size: 4
   },
   { type: "DEER",
     constructor: Deer,
@@ -571,7 +593,7 @@ var species_types = [
     fecundity: 0.25,
     abundance: 0.15,
     lifespan: 8,
-    size: 2
+    size: 3
   },
   { type: "WOLF",
     constructor: Wolf,
