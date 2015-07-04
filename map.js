@@ -6,6 +6,8 @@
 
 function Map(params) {
 
+  var self = this;
+
   var tiles = [],
       organisms = [],
       born_organisms = [],
@@ -19,11 +21,9 @@ function Map(params) {
   this.bounds = { width: width * SIZE, height:height * SIZE };
   this.tile_bounds = { width: width, height:height };
 
-  document.getElementById("map").addEventListener("mousemove", this.mouseOverListener);
-
   this.draw = function() {
 
-    var canvas = document.getElementById("map");
+    var canvas = document.getElementById("canvas");
     var context = canvas.getContext("2d");
 
     context.clearRect(0, 0, canvas.width, canvas.height);
@@ -37,11 +37,20 @@ function Map(params) {
     });
   }
 
+  this.mouseOutListener = function(ev) {
+    var probe = document.getElementById("probe");
+
+    if (ev.clientX > canvas.width || ev.clientY > canvas.height - SIZE) {
+      probe.style.display = "none";
+    }
+  }
+
   this.mouseOverListener = function(ev) {
     var probe = document.getElementById("probe"),
-        tileCoords = map.worldToTileCoords(ev.clientX, ev.clientY),
+        tileCoords = self.worldToTileCoords(ev.clientX, ev.clientY),
         i = tileCoords[0], j = tileCoords[1],
-        tile = map.tileAt(i, j);
+        tile = self.tileAt(i, j);
+
     probe.innerHTML =
       "<strong>x:</strong> " + ev.x + "<br>" +
       "<strong>y:</strong> " + ev.y + "<br>" +
@@ -59,12 +68,12 @@ function Map(params) {
   this.play = function() {
     if (running) {
       running = false;
-      playpause.innerHTML = "Play";
+      playButton.innerHTML = "Play";
     }
     else {
       running = true;
-      playpause.innerHTML = "Pause";
-      animate();
+      playButton.innerHTML = "Pause";
+      self.animate();
     }
   }
 
@@ -72,12 +81,27 @@ function Map(params) {
     update();
   }
 
+  this.reset = function() {
+    if (running)
+      self.play();
+
+    self.generatePopulations();
+    self.updateModel();
+    self.updateUI();
+  }
+
+  document.getElementById("canvas").addEventListener("mouseout", this.mouseOutListener);
+  document.getElementById("canvas").addEventListener("mousemove", this.mouseOverListener);
+  document.getElementById("playpause").addEventListener("click", this.play);
+  document.getElementById("step").addEventListener("click", this.step);
+  document.getElementById("reset").addEventListener("click", this.reset);
+
   this.tileAt = function(i, j) {
     return tiles[i * height + j];
   }
 
   this.tileAtWorldCoords = function(x, y) {
-    return this.tileAt(Math.floor(x / SIZE), Math.floor(y / SIZE));
+    return self.tileAt(Math.floor(x / SIZE), Math.floor(y / SIZE));
   }
 
   this.worldToTileCoords = function(x, y) {
@@ -105,6 +129,8 @@ function Map(params) {
   this.generateHabitats = function() {
 
     var tile;
+
+    tiles = [];
 
     for (var i=0; i < width; i++) {
       for (var j=0; j < height; j++) {
@@ -154,14 +180,14 @@ function Map(params) {
   } // generateHabitats
 
   this.coverAndFill = function(i, j, cover) {
-    tile = this.tileAt(i, j);
+    tile = self.tileAt(i, j);
     visited.push(tile);
     tile.cover = cover;
     this.randomFill(i, j);
   }
 
   this.randomFill = function(i, j) {
-    var tile = this.tileAt(i, j),
+    var tile = self.tileAt(i, j),
       nearby = [ [-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1] ],
       di, dj, pair, nextTile;
 
@@ -182,7 +208,7 @@ function Map(params) {
       dj = j + pair[1];
 
       if ((di >= 0) && (di <= width-1) && (dj >= 0) && (dj <= height-1)) {
-        nextTile = this.tileAt(di, dj);
+        nextTile = self.tileAt(di, dj);
 
         if (visited.indexOf(nextTile) >= 0)
           continue;
@@ -194,7 +220,7 @@ function Map(params) {
           if (Math.random() < tile.cover.n)
             nextTile.cover = tile.cover;
           else
-            this.randomFill(di, dj);
+            self.randomFill(di, dj);
         }
       }
     }
@@ -204,10 +230,13 @@ function Map(params) {
 
     var tile, viable, species, organism;
 
+    self.round = 0;
+    organisms = [];
+
     for (var i=0; i < width; i++) {
       for (var j=0; j < height; j++) {
         
-        tile = this.tileAt(i, j);
+        tile = self.tileAt(i, j);
 
         viable = species_types.filter(function(candidate) {
           return (candidate.habitat.indexOf(tile.cover.type) >= 0)
@@ -220,7 +249,7 @@ function Map(params) {
         species = atRandom(viable);
 
         while (Math.random() < species.fecundity) {
-          organism = new species.constructor(this);
+          organism = new species.constructor(self);
 
           organism.x = (i * SIZE) + Math.floor(Math.random() * SIZE);
           organism.y = (j * SIZE) + Math.floor(Math.random() * SIZE);
@@ -238,25 +267,25 @@ function Map(params) {
   var seasons = ["Spring", "Summer", "Autumn", "Winter"];
 
   // TODO separate animation cycle from model updates
-  update = function() {
-    map.updateModel();
-    map.updateUI();
+  this.update = function() {
+    self.updateModel();
+    self.updateUI();
   }
 
-  animate = function() {
+  this.animate = function() {
     if (running) {
-      update();
-      window.requestAnimationFrame(this.animate);
+      self.update();
+      window.requestAnimationFrame(self.animate);
     }
   }
 
   this.updateModel = function() {
-    this.minute = Math.floor(this.round / 6);
-    this.hour = Math.floor(this.minute / 60);
-    this.day = Math.floor(this.hour / 24);
-    this.month = Math.floor(this.day / 30);
-    this.season = Math.floor((this.month / 3)) % 4;
-    this.round++;
+    self.minute = Math.floor(self.round / 6);
+    self.hour = Math.floor(self.minute / 60);
+    self.day = Math.floor(self.hour / 24);
+    self.month = Math.floor(self.day / 30);
+    self.season = Math.floor((self.month / 3)) % 4;
+    self.round++;
 
     organisms.forEach(function(organism) {
       organism.update();
@@ -279,26 +308,26 @@ function Map(params) {
   }
 
   this.updateUI = function() {
-    var year = Math.floor(this.month / 12);
+    var year = Math.floor(self.month / 12);
 
-    this.hour = ((this.hour % 24) > 9 ? '' : '0') + (this.hour % 24);
-    this.minute = ((this.minute % 60) > 9 ? '' : '0') + (this.minute % 60);
+    self.hour = ((self.hour % 24) > 9 ? '' : '0') + (self.hour % 24);
+    self.minute = ((self.minute % 60) > 9 ? '' : '0') + (self.minute % 60);
 
     year = (year > 0) ? year + (year > 1 ? ' years ' : ' year ') : '';
-    this.month = (this.month > 0) ? (this.month % 12) + (this.month > 1 ? ' months ' : ' month ') : '';
+    self.month = (self.month > 0) ? (self.month % 12) + (self.month > 1 ? ' months ' : ' month ') : '';
 
-    stats.innerHTML = '<strong>round: </strong>' + this.round + '<br>' +
-      '<strong>duration: </strong>' + year + this.month + (this.day % 30) + ' days<br>' +
-      '<strong>season: </strong>' + seasons[this.season] + '<br>' +
-      '<strong>time: </strong>' + this.hour + ":" + this.minute + '<br>' +
+    stats.innerHTML = '<strong>round: </strong>' + self.round + '<br>' +
+      '<strong>duration: </strong>' + year + self.month + (self.day % 30) + ' days<br>' +
+      '<strong>season: </strong>' + seasons[self.season] + '<br>' +
+      '<strong>time: </strong>' + self.hour + ":" + self.minute + '<br>' +
       '<strong>deer: </strong>' + sum_population("DEER") + ' <br>' +
       '<strong>wolves: </strong>' + sum_population("WOLF");
 
-    map.draw();
+    self.draw();
   }
 
-  this.generateHabitats();
-  this.generatePopulations();
+  self.generateHabitats();
+  self.generatePopulations();
 }
 
 function Tile() {
@@ -325,6 +354,8 @@ function randomDirection(x, y) {
 }
 
 function Organism(map) {
+
+  var self = this;
   
   this.map = map;
   this.health = this.species.health;
@@ -348,8 +379,8 @@ function Organism(map) {
 
   this.nearbyOrganisms = function(filter) {
 
-    var nearby = this.tile.inhabitants.filter(filter, this),
-        tileCoords = this.map.worldToTileCoords(this.x, this.y);
+    var nearby = self.tile.inhabitants.filter(filter, self),
+        tileCoords = self.map.worldToTileCoords(self.x, self.y);
 
     if (nearby.length == 0) {
       deltas.forEach(function(delta) {
@@ -358,38 +389,38 @@ function Organism(map) {
 
         if ((x >= 0) && (x <= map.tile_bounds.width - 1) &&
             (y >= 0) && (y <= map.tile_bounds.height - 1)) {
-          nearby = nearby.concat(this.map.tileAt(x, y).inhabitants);
+          nearby = nearby.concat(self.map.tileAt(x, y).inhabitants);
         }
-      }, this);
+      }, self);
     }
 
-    nearby = nearby.filter(filter, this);
+    nearby = nearby.filter(filter, self);
 
-    return nearby.sort(this.distanceFrom);
+    return nearby.sort(self.distanceFrom);
   }
 
   this.nearbyPrey = function() {
-    if (!this.species.prey) {
+    if (!self.species.prey) {
       return [];
     }
-    return this.nearbyOrganisms(preyFilter);
+    return self.nearbyOrganisms(preyFilter);
   }
 
   this.nearbyPredators = function() {
-    if (!this.species.predators) {
+    if (!self.species.predators) {
       return [];
     }
-    return this.nearbyOrganisms(predatorFilter);
+    return self.nearbyOrganisms(predatorFilter);
   }
 
   this.distanceFrom = function(a, b) {
-    return distance(a, this) - distance(b, this);
+    return distance(a, self) - distance(b, self);
   }
 
   this.update = function() {
 
-    if (this.status == "DEAD") {
-      console.log("update: organism is dead", this);
+    if (self.status == "DEAD") {
+      console.log("update: organism is dead", self);
       return;
     }
 
@@ -399,44 +430,44 @@ function Organism(map) {
     if ((map.hour > 20) && (map.hour < 6)) {
       status = "SLEEP";
     }
-    else if (map.hour - this.last_drink > 2.5) {
+    else if (map.hour - self.last_drink > 2.5) {
       status = "THIRSTY";
     }
-    else if ((this instanceof Wolf) && (map.hour - this.last_food > 48)) {
+    else if ((self instanceof Wolf) && (map.hour - self.last_food > 48)) {
       status = "HUNGRY";
     }
 
     // number of rounds organism can survive without food
-    var health_rounds = 1 / (this.species.health * 24 * 60 * 60 * 60),
+    var health_rounds = 1 / (self.species.health * 24 * 60 * 60 * 60),
         nearby_prey, nearby_predators, nearest, dx, dy;
 
     // decrease in health due to hunger 
-    this.health -= health_rounds;
+    self.health -= health_rounds;
 
     // 5% chance of dropping dead (per round) if your health is below zero
-    if ((this.health < 0) &&
+    if ((self.health < 0) &&
         (Math.random() < 0.05)) {
-      this.die();
+      self.die();
       return;
     }
 
     // 1% chance of dropping dead (per round) if you are older than lifespan
-    if ((((map.day - this.birthday) / 360) > this.species.lifespan) &&
+    if ((((map.day - self.birthday) / 360) > self.species.lifespan) &&
         (Math.random() < 0.01)) {
-      this.die();
+      self.die();
       return;
     }
 
     // if we have predators nearby, run away
-    nearby_predators = this.nearbyPredators();
+    nearby_predators = self.nearbyPredators();
     // otherwise if we have prey nearby, it's safe to move towards
-    nearby_prey = this.nearbyPrey();
+    nearby_prey = self.nearbyPrey();
 
     if (nearby_predators && nearby_predators.length > 0) {
       nearest = nearby_predators[0];
-      if (distance(this, nearest) < this.species.move) {
-        dx = this.x + Math.sign(this.x - nearest.x);
-        dy = this.y + Math.sign(this.y - nearest.y);
+      if (distance(self, nearest) < self.species.move) {
+        dx = self.x + Math.sign(self.x - nearest.x);
+        dy = self.y + Math.sign(self.y - nearest.y);
       }
     }
     else if (status == "SLEEP") {
@@ -451,7 +482,7 @@ function Organism(map) {
     else if (nearby_prey && nearby_prey.length > 0) {
       nearest = nearby_prey[0];
       // if we are at the prey, eat it
-      if (distance(this, nearest) == 0) {
+      if (distance(self, nearest) == 0) {
         if (nearest.species.type == "PLANT") {
           // let it take one hour to eat a plant of size 1
           // 60 rounds/second * 60 seconds/minute * 60 minutes/hour
@@ -463,33 +494,33 @@ function Organism(map) {
         else {
           nearest.die();
         }
-        this.health = this.species.health;
+        self.health = self.species.health;
       }
       else {
         // TODO take move speed into account
-        dx = this.x + Math.sign(nearest.x - this.x) * this.move / 10;
-        dy = this.y + Math.sign(nearest.y - this.y) * this.move / 10;
+        dx = self.x + Math.sign(nearest.x - self.x) * self.move / 10;
+        dy = self.y + Math.sign(nearest.y - self.y) * self.move / 10;
       }
     }
 
-    if ((dx >= 0) && (dx <= this.map.bounds.width) && (dy >= 0) && (dy <= this.map.bounds.height)) {
+    if ((dx >= 0) && (dx <= self.map.bounds.width) && (dy >= 0) && (dy <= self.map.bounds.height)) {
 
       var dest = map.tileAtWorldCoords(dx, dy);
 
       // TODO path finding
-      if (this.canMove(dest)) {
-        this.x = dx;
-        this.y = dy;
-        var newTile = map.tileAtWorldCoords(this.x, this.y);
-        if (this.tile !== newTile) {
-          var index = this.tile.inhabitants.indexOf(this);
+      if (self.canMove(dest)) {
+        self.x = dx;
+        self.y = dy;
+        var newTile = map.tileAtWorldCoords(self.x, self.y);
+        if (self.tile !== newTile) {
+          var index = self.tile.inhabitants.indexOf(self);
           if (index < 0) {
-            console.log("update: bad location", this);
+            console.log("update: bad location", self);
           }
           else {
-            this.tile.inhabitants.splice(index, 1);
-            newTile.inhabitants.push(this);
-            this.tile = newTile;
+            self.tile.inhabitants.splice(index, 1);
+            newTile.inhabitants.push(self);
+            self.tile = newTile;
           }
         }
       }
@@ -497,29 +528,29 @@ function Organism(map) {
   }
 
   this.die = function() {
-    if (this.status != "DEAD") {
-      this.status = "DEAD";
-      this.move = 0;
-      this.map.kill_organism(this);
-      var tileIndex = this.tile.inhabitants.indexOf(this);
+    if (self.status != "DEAD") {
+      self.status = "DEAD";
+      self.move = 0;
+      self.map.kill_organism(self);
+      var tileIndex = self.tile.inhabitants.indexOf(self);
       if (tileIndex < 0) {
-        console.log("die: Unable to remove inhabitant from tile", this);
+        console.log("die: Unable to remove inhabitant from tile", self);
       }
       else {
-        this.tile.inhabitants.splice(tileIndex, 1);
-        this.tile = null;
+        self.tile.inhabitants.splice(tileIndex, 1);
+        self.tile = null;
       }
     }
   }
 
   this.canMove = function(tile) {
-    return this.species.habitat.indexOf(tile.cover.type) >= 0;
+    return self.species.habitat.indexOf(tile.cover.type) >= 0;
   }
 
   this.displayOn = function(context) {
-    context.fillStyle = this.color;
+    context.fillStyle = self.color;
     context.beginPath();
-    context.arc(this.x-Math.sqrt(this.size)/2, this.y-Math.sqrt(this.size)/2, Math.sqrt(this.size), 0, Math.PI*2);
+    context.arc(self.x-Math.sqrt(self.size)/2, self.y-Math.sqrt(self.size)/2, Math.sqrt(self.size), 0, Math.PI*2);
     context.fill();
   }
 }
@@ -532,8 +563,10 @@ function distance(a, b) {
 }
 
 function Plant(map) {
+  
   this.species = species_types[0];
   Organism.call(this, map);
+
   this.size = Math.floor(Math.random() * this.species.size) + 1;
   this.color = this.species.color;
 
@@ -545,8 +578,10 @@ function Plant(map) {
 Plant.prototype = Object.create(Organism.prototype);
 
 function Deer(map) {
+
   this.species = species_types[1];
   Organism.call(this, map);
+  
   this.size = Math.floor(Math.random() * this.species.size) + 1;
   this.color = this.species.color;
 }
@@ -554,8 +589,10 @@ function Deer(map) {
 Deer.prototype = Object.create(Organism.prototype);
 
 function Wolf(map) {
+
   this.species = species_types[2];
   Organism.call(this, map);
+  
   this.size = Math.floor(Math.random() * this.species.size) + 1;
   this.color = this.species.color;
 }
