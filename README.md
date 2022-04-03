@@ -10,7 +10,7 @@ Deer eat vegetation and wolves eat deer.
 * Wolves and deer can die of starvation
 * Vegetation and deer can die of predation
 
-I wrote it as an exercise to learn JavaScript about 5 years ago. Briefly, there are a few issues:
+I wrote it as an exercise to learn JavaScript about 7 years ago. Briefly, there are a few issues:
 
 ## Code issues
 1. The inheritance model is out of date, based on an overly complicated prototype model. It would be good to
